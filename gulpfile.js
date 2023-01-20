@@ -10,27 +10,45 @@ const concat = require('gulp-concat')
 const sourcemaps = require('gulp-sourcemaps')
 const autoprefixer = require('gulp-autoprefixer')
 const imagemin = require('gulp-imagemin')
+const htmlmin = require('gulp-htmlmin')
+const size = require('gulp-size')
+const newer = require('gulp-newer')
+const browsersync = require('browser-sync').create()
 const del = require('del')
 
 // Пути к файлам
 const paths = {
+    html: {
+        src: 'src/*.html',
+        dest: 'dist'
+    },
     styles: {
         src: ['src/style/**/*.sass', 'src/style/**/*.scss', 'src/style/**/*.less'],
-        dest: 'dist/css/'
+        dest: 'dist/css'
     },
     scripts: {
         src: 'src/script/**/*.js',
         dest: 'dist/js/'
     },
     images: {
-        src: 'src/img/*',
+        src: 'src/img/**',
         dest: 'dist/img'
     }
 }
 
 // Очистка каталога
 function clean() {
-    return del(['dist'])
+    return del(['dist/*', '!dist/img'])
+}
+
+function html() {
+    return gulp.src(paths.html.src)
+    .pipe(htmlmin({collapseWhitespace: true}))
+    .pipe(size({
+        showFiles: true
+    }))
+    .pipe(gulp.dest(paths.html.dest))
+    .pipe(browsersync.stream())
 }
 
 // Функция обработки стилей
@@ -50,7 +68,11 @@ function styles() {
             suffix: '.min'
         }))
         .pipe(sourcemaps.write('.'))
+        .pipe(size({
+            showFiles: true
+        }))
         .pipe(gulp.dest(paths.styles.dest))
+        .pipe(browsersync.stream())
 }
 
 // Функция обработки скриптов
@@ -63,11 +85,16 @@ function scripts() {
         .pipe(uglify())
         .pipe(concat('main.min.js'))
         .pipe(sourcemaps.write('.'))
+        .pipe(size({
+            showFiles: true
+        }))
         .pipe(gulp.dest(paths.scripts.dest))
+        .pipe(browsersync.stream())
 }
 
 function img() {
     return gulp.src(paths.images.src)
+        .pipe(newer(paths.images.dest))
         .pipe(imagemin({
             progressive: true
         }))
@@ -75,14 +102,24 @@ function img() {
 }
 
 function watch() {
+    browsersync.init({
+        server: {
+            baseDir: "./dist/"
+        }
+    })
+    gulp.watch(paths.html.dest).on('change', 
+    browsersync.reload)
+    gulp.watch(paths.html.src, html)
     gulp.watch(paths.styles.src, styles)
     gulp.watch(paths.scripts.src, scripts)
+    gulp.watch(paths.images.src, img)
 }
 
-const build = gulp.series(clean, gulp.parallel(styles, scripts, img), watch)
+const build = gulp.series(clean, html, gulp.parallel(styles, scripts, img), watch)
 
 exports.clean = clean
 exports.img = img
+exports.html =html
 exports.styles = styles
 exports.scrpits = scripts
 exports.watch = watch
